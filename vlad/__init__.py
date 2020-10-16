@@ -1,0 +1,1 @@
+from .vlad import VLAD
