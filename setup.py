@@ -1,9 +1,9 @@
-from setuptools import setup
+import setuptools
 
-setup(
+setuptools.setup(
     name='vlad',
     version='0.0.1',
-    packages=[''],
+    packages=setuptools.find_packages(),
     url='',
     license='mit',
     author='Tim Hilt',
