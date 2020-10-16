@@ -18,6 +18,8 @@ of the original formulation are also implemented. I took them from [1, 4, 5] and
 
 - Numpy
 - Scikit-Learn
+- Progressbar2
+- OpenCV (for the examples)
 
 ## Install-Instructions
 
@@ -25,7 +27,59 @@ of the original formulation are also implemented. I took them from [1, 4, 5] and
 
 ## Usage
 
-**TODO**
+The API is based on the wonderful Scikit-Learn API, which uses the basic notion of `fit`/ `predict`/ `transform`. So far
+I didn't have a reason to transform anything, so `fit` and `predict` (along with `predict_proba`) are the functions
+comparable to sklearns API.
+
+To include `VLAD` in the current file just write:
+
+```python
+from vlad import VLAD
+```
+
+On initialization, the number of visual words (`k`) and the norming-scheme are given. Norming is a crucial difference
+in between different implementations [1, 4, 5] with [5] containing the preferable one. To instantiate a VLAD-object
+write:
+
+```python
+vlad = VLAD(k=16, norming="RN")  # Defaults are k=256 and norming="original"
+```
+
+After having instantiated the object you can fit the visual vocabulary with:
+
+```python
+vlad.fit(X)
+```
+
+The `fit`-function also returns the instance (again, sklearn-style), so the following two are equivalent:
+
+```python
+vlad = VLAD(k=16, norming="RN")
+vlad.fit(X)
+# ...
+vlad = VLAD(k=16, norming="RN").fit(X)
+```
+
+`X` is a tensor of image-descriptors ($m \times d \times n$), where $m$ is the number of descriptors per image, $d$
+is the number of dimensions per descriptor and $n$ is the total number of image-descriptors. It's best to use
+image-descriptors in euclidean space (Such as SIFT or RootSIFT [6]), rather than in hamming space, as the
+KMeans-clustering won't work properly with hamming-descriptors.
+
+Whenever a visual dictionary is fitted, the dictionary is saved to disc and can be loaded manually to bypass training.
+
+To check for an image one can write:
+
+```python
+vlad.predict(imdesc)  # imdesc is a (m x d) descriptor-matrix
+```
+
+to get the image-index with maximum similarity. Alternatively
+
+```python
+vlad.predict_proba(imdesc)
+```
+
+can be used to obtain a Numpy-array with all similarity scores. 
 
 ## Documentation
 

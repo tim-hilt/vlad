@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.linalg import norm
 from sklearn.cluster import KMeans
-from joblib import dump
+from joblib import dump, load
 import progressbar as pb
 
 
@@ -68,11 +68,14 @@ class VLAD:
         self : VLAD
             Fitted object
         """
-        self.dictionary = KMeans(n_clusters=self.k).fit(X.transpose((2, 0, 1))
-                                                        .reshape(-1, X.shape[1]))  # 3D to 2D
-        self.centers = self.dictionary.cluster_centers_
-        if save is True:
-            _ = dump(self.dictionary, "dictionary.joblib")
+        if self.dictionary is None:
+            self.dictionary = KMeans(n_clusters=self.k).fit(X.transpose((2, 0, 1))
+                                                            .reshape(-1, X.shape[1]))  # 3D to 2D
+            self.centers = self.dictionary.cluster_centers_
+            if save is True:
+                _ = dump(self.dictionary, "dictionary.joblib")
+        else:
+            print("Dictionary already fitted. Use refit() to force retraining.")
         self.database = self._extract_vlads(X)
         return self
 
@@ -92,11 +95,21 @@ class VLAD:
         self : VLAD
             Refitted object
         """
-        self.dictionary = KMeans(n_clusters=self.k, init=self.centers).fit(X)
+        self.dictionary = KMeans(n_clusters=self.k, init=self.centers).fit(X.transpose((2, 0, 1))
+                                                                           .reshape(-1, X.shape[1]))
+        self.centers = self.dictionary.cluster_centers_
         if save is True:
             _ = dump(self.dictionary, "dictionary.joblib")
         self.database = self._extract_vlads(X)
         return self
+
+    def load_vocab(self, filename):
+        try:
+            self.dictionary = load(filename)
+            self.centers = self.dictionary.cluster_centers_
+        except FileNotFoundError:
+            print(f"The file {filename} was not found!")
+
 
     def predict(self, desc):
         """Predict class of given descriptor
@@ -191,6 +204,40 @@ class VLAD:
         ``None``
         """
         self.database = np.vstack((self.database, vlad))
+
+    def save_database(self):
+        """Save the fitted database to disk
+
+        Saving the database allows for future users to manually load it. This way some time can be
+        saved and the object doesn't have to be fitted.
+
+        Returns
+        -------
+        ``None``
+        """
+        if self.database is not None:
+            np.save("database.npy", self.database)
+        else:
+            print("No database fitted yet. use fit() first.")
+
+    def load_database(self, filename, force=False):
+        """Manually load database
+
+        Parameters
+        ----------
+        filename : str
+            Filename of the database
+        force : bool, default=True
+            If `True` forces loading of the database, even if `self.database` is not None
+
+        Returns
+        -------
+        ``None``
+        """
+        if self.database is None or force is True:
+            self.database = np.load(filename)
+        else:
+            print("There's a database present already. Use force=True to overwrite it.")
 
     @staticmethod
     def _power_law_norm(X, alpha=.2):
