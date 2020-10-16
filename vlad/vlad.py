@@ -68,6 +68,7 @@ class VLAD:
         self : VLAD
             Fitted object
         """
+        # TODO: Maybe generalize better by passing a list of descriptors instead of a tensor!
         if self.dictionary is None:
             self.dictionary = KMeans(n_clusters=self.k).fit(X.transpose((2, 0, 1))
                                                             .reshape(-1, X.shape[1]))  # 3D to 2D
@@ -95,6 +96,7 @@ class VLAD:
         self : VLAD
             Refitted object
         """
+        # TODO: Maybe generalize better by passing a list of descriptors instead of a tensor!
         self.dictionary = KMeans(n_clusters=self.k, init=self.centers).fit(X.transpose((2, 0, 1))
                                                                            .reshape(-1, X.shape[1]))
         self.centers = self.dictionary.cluster_centers_
@@ -104,20 +106,20 @@ class VLAD:
         return self
 
     def load_vocab(self, filename):
+        """Manually load vocabulary from filename"""
         try:
-            self.dictionary = load(filename)
+            self.dictionary = load(str(filename))
             self.centers = self.dictionary.cluster_centers_
         except FileNotFoundError:
             print(f"The file {filename} was not found!")
 
-
     def predict(self, desc):
-        """Predict class of given descriptor
+        """Predict class of given descriptor-matrix
 
         Parameters
         ----------
         desc : array
-            A descriptor (m x d)
+            A descriptor-matrix (m x d)
 
         Returns
         -------
@@ -126,12 +128,12 @@ class VLAD:
         return np.argmax(self.predict_proba(desc))
 
     def predict_proba(self, desc):
-        """Predict class of given descriptor, return probability
+        """Predict class of given descriptor-matrix, return probability
 
         Parameters
         ----------
         desc : array
-            A descriptor (m x d)
+            A descriptor-matrix (m x d)
 
         Returns
         -------
@@ -142,12 +144,12 @@ class VLAD:
         return self.database @ vlad  # Similarity between L2-normed vectors is defined as dot-product
 
     def _vlad(self, X):
-        """Construct the actual VLAD-descriptor
+        """Construct the actual VLAD-descriptor from a matrix of local descriptors
 
         Parameters
         ----------
         X : array
-            Local Descriptors for a given image
+            Descriptor-matrix for a given image
 
         Returns
         -------
