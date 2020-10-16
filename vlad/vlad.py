@@ -65,7 +65,8 @@ class VLAD:
 
         Returns
         -------
-        ``None``
+        self : VLAD
+            Fitted object
         """
         self.dictionary = KMeans(n_clusters=self.k).fit(X.transpose((2, 0, 1))
                                                         .reshape(-1, X.shape[1]))  # 3D to 2D
@@ -73,6 +74,7 @@ class VLAD:
         if save is True:
             _ = dump("dictionary.joblib", self.dictionary)
         self.database = self._extract_vlads(X)
+        return self
 
     def refit(self, X, save=True):
         """Refit the Visual Vocabulary
@@ -87,12 +89,14 @@ class VLAD:
 
         Returns
         -------
-        ``None``
+        self : VLAD
+            Refitted object
         """
         self.dictionary = KMeans(n_clusters=self.k, init=self.centers).fit(X)
         if save is True:
             _ = dump("dictionary.joblib", self.dictionary)
         self.database = self._extract_vlads(X)
+        return self
 
     def predict(self, desc):
         """Predict class of given descriptor
@@ -212,3 +216,9 @@ class VLAD:
         """
         normed = np.sign(X) * np.abs(X)**alpha
         return normed
+
+    def __repr__(self):
+        return f"VLAD(k={self.k}, norming=\"{self.norming}\")"
+
+    def __str__(self):
+        return f"VLAD(k={self.k}, norming=\"{self.norming}\")"
