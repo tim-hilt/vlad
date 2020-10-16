@@ -72,7 +72,7 @@ class VLAD:
                                                         .reshape(-1, X.shape[1]))  # 3D to 2D
         self.centers = self.dictionary.cluster_centers_
         if save is True:
-            _ = dump("dictionary.joblib", self.dictionary)
+            _ = dump(self.dictionary, "dictionary.joblib")
         self.database = self._extract_vlads(X)
         return self
 
@@ -94,7 +94,7 @@ class VLAD:
         """
         self.dictionary = KMeans(n_clusters=self.k, init=self.centers).fit(X)
         if save is True:
-            _ = dump("dictionary.joblib", self.dictionary)
+            _ = dump(self.dictionary, "dictionary.joblib")
         self.database = self._extract_vlads(X)
         return self
 
