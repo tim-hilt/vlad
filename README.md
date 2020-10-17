@@ -90,7 +90,7 @@ Documentation can be found at [...] **TODO**
 | **Task**                                       | **Status** |
 |------------------------------------------------|------------|
 | Original formulation (SSR, L2) [1]             | Done       |
-| Use RootSIFT-descriptors [6]                   | TODO       |
+| Use RootSIFT-descriptors [6]                   | Done       |
 | Try with more descriptors                      | TODO       |
 | Try with dense descriptors                     | TODO       |
 | Intra-Normalization [4]                        | Done       |

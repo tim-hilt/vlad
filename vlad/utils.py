@@ -27,11 +27,11 @@ def RootSIFT(descs):
            should know to improve object retrieval. In 2012 IEEE Conference on Computer
            Vision and Pattern Recognition (pp. 2911-2918). IEEE.
     """
-    if type(descs) == list:
+    if isinstance(descs, list):
         for i in range(len(descs)):
             descs[i] = np.sqrt(descs[i] / norm(descs, ord=1, axis=1))
-    elif type(descs) == np.ndarray:
-        descs = np.sqrt(descs / norm(descs, ord=1, axis=1))
+    elif isinstance(descs, np.ndarray):
+        descs = np.sqrt(descs / norm(descs, ord=1, axis=1)[:, np.newaxis])  # New axis in order to broadcast correctly
     else:
         print("{} not supported! Choose one of [list, numpy.ndarray].".format(type(descs)))
         return
