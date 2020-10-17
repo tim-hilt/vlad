@@ -104,7 +104,7 @@ Documentation can be found at [...] **TODO**
 | Include Install-Instructions                   | TODO       |
 | Include Usage-Examples                         | Done       |
 | Publish to PyPi                                | TODO       |
-| Provide example notebooks                      | TODO       |
+| Provide example notebooks                      | Done       |
 
 ## References
 

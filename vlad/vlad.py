@@ -160,8 +160,13 @@ class VLAD:
         m, d = X.shape
         V = np.zeros((self.k, d))  # Initialize VLAD-Matrix
 
-        for i in range(self.k):
-            V[i] = np.sum(X[predicted == i] - self.centers[i], axis=0)  # TODO: Could this part be vectorized
+        if self.norming == "RN":
+            for i in range(self.k):
+                curr = X[predicted == i] - self.centers[i]
+                V[i] = np.sum(curr / norm(curr, axis=1)[:, None], axis=0)
+        else:
+            for i in range(self.k):
+                V[i] = np.sum(X[predicted == i] - self.centers[i], axis=0)  # TODO: Could this part be vectorized
 
         if self.norming in ("intra", "RN"):
             V /= norm(V, axis=1)[:, None]  # L2-normalize every sum of residuals
