@@ -80,6 +80,39 @@ class VLAD:
         self.database = self._extract_vlads(X)
         return self
 
+    def transform(self, X):
+        """Transform the input-tensor to a matrix of VLAD-descriptors
+
+        Parameters
+        ----------
+        X : array, shape (m, d, n)
+            Tensor of image-descriptors
+
+        Returns
+        -------
+        vlads : array, shape (n, d x self.k)
+            The transformed VLAD-descriptors
+        """
+        vlads = self._extract_vlads(X)
+        return vlads
+
+    def fit_transform(self, X):
+        """Fit the model and transform the input-data subsequently
+
+        Parameters
+        ----------
+        X : array, shape (m, d, n)
+            Tensor of image-descriptors
+
+        Returns
+        -------
+        vlads : array, shape (n, d x self.k)
+            The transformed VLAD-descriptors
+        """
+        _ = self.fit(X)
+        vlads = self.transform(X)
+        return vlads
+
     def refit(self, X, save=True):
         """Refit the Visual Vocabulary
 
@@ -184,8 +217,8 @@ class VLAD:
 
         Parameters
         ----------
-        X : array
-            Tensor of image-descriptors (m x d x n)
+        X : array, shape (m, d, n)
+            Tensor of image-descriptors
 
         Returns
         -------
