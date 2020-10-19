@@ -1,0 +1,3 @@
+*.npy
+*.joblib
+.ipynb_checkpoints

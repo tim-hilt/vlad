@@ -18,6 +18,8 @@ class VLAD:
     norming : {"original", "intra", "RN"}, default="original"
         How the norming of the VLAD-descriptors should be performed.
         For more info see below.
+    lcs : bool, default=True
+        If `True`, uses Local Coordinate System (LCS) described in [3]_.
 
     Attributes
     ----------
@@ -46,12 +48,13 @@ class VLAD:
            Revisiting the VLAD image representation. In Proceedings of the 21st ACM
            international conference on Multimedia (pp. 653-656).
     """
-    def __init__(self, k=256, norming="original"):
+    def __init__(self, k=256, norming="original", lcs=True):
         self.k = k
         self.norming = norming
         self.dictionary = None
         self.centers = None
         self.database = None
+        self.lcs = lcs
 
     def fit(self, X, save=True):
         """Fit Visual Vocabulary
@@ -90,7 +93,7 @@ class VLAD:
 
         Returns
         -------
-        vlads : array, shape (n, d x self.k)
+        vlads : array, shape (n, d * self.k)
             The transformed VLAD-descriptors
         """
         vlads = self._extract_vlads(X)
@@ -106,7 +109,7 @@ class VLAD:
 
         Returns
         -------
-        vlads : array, shape (n, d x self.k)
+        vlads : array, shape (n, d * self.k)
             The transformed VLAD-descriptors
         """
         _ = self.fit(X)

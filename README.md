@@ -1,3 +1,8 @@
+<script type="text/javascript" async
+src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js? 
+config=TeX-MML-AM_CHTML">
+</script>
+
 # Vector of Locally Aggregated Descriptors (VLAD)
 
 ---
@@ -27,9 +32,7 @@ of the original formulation are also implemented. I took them from [1, 4, 5] and
 
 ## Usage
 
-The API is based on the wonderful Scikit-Learn API, which uses the basic notion of `fit`/ `predict`/ `transform`. So far
-I didn't have a reason to transform anything, so `fit` and `predict` (along with `predict_proba`) are the functions
-comparable to sklearns API.
+The API is based on the wonderful Scikit-Learn API, which uses the basic notion of `fit`/ `predict`/ `transform`.
 
 To include `VLAD` in the current file just write:
 
@@ -60,8 +63,8 @@ vlad.fit(X)
 vlad = VLAD(k=16, norming="RN").fit(X)
 ```
 
-`X` is a tensor of image-descriptors ($m \times d \times n$), where $m$ is the number of descriptors per image, $d$
-is the number of dimensions per descriptor and $n$ is the total number of image-descriptors. It's best to use
+`X` is a tensor of image-descriptors (m x d x n), where m is the number of descriptors per image, d
+is the number of dimensions per descriptor and n is the total number of image-descriptors. It's best to use
 image-descriptors in euclidean space (Such as SIFT or RootSIFT [6]), rather than in hamming space, as the
 KMeans-clustering won't work properly with hamming-descriptors.
 
@@ -79,7 +82,16 @@ to get the image-index with maximum similarity. Alternatively
 vlad.predict_proba(imdesc)
 ```
 
-can be used to obtain a Numpy-array with all similarity scores. 
+can be used to obtain a Numpy-array with all similarity scores.
+
+If you want to work with the VLAD-descriptors outside of the class, the `transform`- and `fit_transform`-functions can
+be utilized:
+
+```python
+vlads = vlad.transform(descriptor_tensor)  # Call on fitted model
+
+vlads = vlad.fit_transform(descriptor_tensor)  # Can be called on a non-fitted model
+```
 
 ## Documentation
 
