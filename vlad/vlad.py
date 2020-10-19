@@ -1,6 +1,10 @@
+"""
+DOCSTRING
+"""
 import numpy as np
 from numpy.linalg import norm
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 from joblib import dump, load
 import progressbar as pb
 
@@ -20,6 +24,8 @@ class VLAD:
         For more info see below.
     lcs : bool, default=True
         If `True`, uses Local Coordinate System (LCS) described in [3]_.
+    verbose : bool, default=True
+        If `True` print messages here and there
 
     Attributes
     ----------
@@ -48,13 +54,15 @@ class VLAD:
            Revisiting the VLAD image representation. In Proceedings of the 21st ACM
            international conference on Multimedia (pp. 653-656).
     """
-    def __init__(self, k=256, norming="original", lcs=True):
+    def __init__(self, k=256, norming="original", lcs=False, verbose=True):
         self.k = k
         self.norming = norming
         self.dictionary = None
         self.centers = None
         self.database = None
         self.lcs = lcs
+        self.qs = None
+        self.verbose = verbose
 
     def fit(self, X, save=True):
         """Fit Visual Vocabulary
@@ -73,11 +81,21 @@ class VLAD:
         """
         # TODO: Maybe generalize better by passing a list of descriptors instead of a tensor!
         if self.dictionary is None:
-            self.dictionary = KMeans(n_clusters=self.k).fit(X.transpose((2, 0, 1))
-                                                            .reshape(-1, X.shape[1]))  # 3D to 2D
+            X_mat = X.transpose((2, 0, 1)).reshape(-1, X.shape[1])   # 3D to 2D
+            if self.verbose is True:
+                print("Training KMeans...")
+            self.dictionary = KMeans(n_clusters=self.k).fit(X_mat)
             self.centers = self.dictionary.cluster_centers_
             if save is True:
                 _ = dump(self.dictionary, "dictionary.joblib")
+            if self.lcs is True and self.norming == "RN":
+                if self.verbose is True:
+                    print("Finding rotation-matrices...")
+                predicted = self.dictionary.predict(X_mat)
+                self.qs = []
+                for i in range(self.k):
+                    q = PCA().fit(X_mat[predicted == i]).components_
+                    self.qs.append(q)
         else:
             print("Dictionary already fitted. Use refit() to force retraining.")
         self.database = self._extract_vlads(X)
@@ -192,6 +210,8 @@ class VLAD:
         ``V.flatten()`` : array
             The VLAD-descriptor
         """
+        np.seterr(invalid='ignore', divide='ignore')  # Division with 0 encountered below
+
         predicted = self.dictionary.predict(X)
         m, d = X.shape
         V = np.zeros((self.k, d))  # Initialize VLAD-Matrix
@@ -200,9 +220,11 @@ class VLAD:
             for i in range(self.k):
                 curr = X[predicted == i] - self.centers[i]
                 V[i] = np.sum(curr / norm(curr, axis=1)[:, None], axis=0)
+                if self.lcs is True:
+                    V[i] = self.qs[i] @ V[i]  # Equivalent to multiplication in  summation above
         else:
             for i in range(self.k):
-                V[i] = np.sum(X[predicted == i] - self.centers[i], axis=0)  # TODO: Could this part be vectorized
+                V[i] = np.sum(X[predicted == i] - self.centers[i], axis=0)
 
         if self.norming in ("intra", "RN"):
             V /= norm(V, axis=1)[:, None]  # L2-normalize every sum of residuals

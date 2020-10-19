@@ -107,15 +107,14 @@ Documentation can be found at [...] **TODO**
 | Try with dense descriptors                     | TODO       |
 | Intra-Normalization [4]                        | Done       |
 | Residual-Normalization (RN) [5]                | Done       |
-| Local Coordinate System (LCS) [5]              | TODO       |
+| Local Coordinate System (LCS) [5]              | Done       |
 | Dimensionality-Reduction [7,8]                 | TODO       |
-| Quantization [9]                               | TODO       |
+| Quantization [9]                               | Done       |
 | Generalization using multiple vocabularies [7] | TODO       |
 | Make documentation                             | TODO       |
 | Include Tests                                  | TODO       |
 | Include Install-Instructions                   | TODO       |
 | Include Usage-Examples                         | Done       |
-| Publish to PyPi                                | TODO       |
 | Provide example notebooks                      | Done       |
 
 ## References
