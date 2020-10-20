@@ -5,7 +5,6 @@ import numpy as np
 from numpy.linalg import norm
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from joblib import dump, load
 import progressbar as pb
 
 
@@ -64,15 +63,13 @@ class VLAD:
         self.qs = None
         self.verbose = verbose
 
-    def fit(self, X, save=True):
+    def fit(self, X):
         """Fit Visual Vocabulary
 
         Parameters
         ----------
         X : array
             Tensor of image descriptors (m x d x n)
-        save : bool
-            If ``True`` save fitted vocabulary to disk
 
         Returns
         -------
@@ -86,8 +83,6 @@ class VLAD:
                 print("Training KMeans...")
             self.dictionary = KMeans(n_clusters=self.k).fit(X_mat)
             self.centers = self.dictionary.cluster_centers_
-            if save is True:
-                _ = dump(self.dictionary, "dictionary.joblib")
             if self.lcs is True and self.norming == "RN":
                 if self.verbose is True:
                     print("Finding rotation-matrices...")
@@ -134,16 +129,13 @@ class VLAD:
         vlads = self.transform(X)
         return vlads
 
-    def refit(self, X, save=True):
+    def refit(self, X):
         """Refit the Visual Vocabulary
 
         Parameters
         ----------
         X : array
             The database used to refit the visual vocabulary
-        save : bool, default=True
-            If ``True`` save refitted vocabulary to disk, possibly
-            overwriting existing ``dictionary.joblib``
 
         Returns
         -------
@@ -154,18 +146,8 @@ class VLAD:
         self.dictionary = KMeans(n_clusters=self.k, init=self.centers).fit(X.transpose((2, 0, 1))
                                                                            .reshape(-1, X.shape[1]))
         self.centers = self.dictionary.cluster_centers_
-        if save is True:
-            _ = dump(self.dictionary, "dictionary.joblib")
         self.database = self._extract_vlads(X)
         return self
-
-    def load_vocab(self, filename):
-        """Manually load vocabulary from filename"""
-        try:
-            self.dictionary = load(str(filename))
-            self.centers = self.dictionary.cluster_centers_
-        except FileNotFoundError:
-            print(f"The file {filename} was not found!")
 
     def predict(self, desc):
         """Predict class of given descriptor-matrix
