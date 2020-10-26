@@ -1,6 +1,8 @@
 """
 DOCSTRING
 """
+from random import sample
+
 import numpy as np
 from numpy.linalg import norm
 from sklearn.cluster import KMeans
@@ -68,20 +70,20 @@ class VLAD:
 
         Parameters
         ----------
-        X : array
-            Tensor of image descriptors (m x d x n)
+        X : list(array)
+            List of image descriptors
 
         Returns
         -------
         self : VLAD
             Fitted object
         """
-        # TODO: Maybe generalize better by passing a list of descriptors instead of a tensor!
         if self.dictionary is None:
-            X_mat = X.transpose((2, 0, 1)).reshape(-1, X.shape[1])   # 3D to 2D
+            X_mat = np.vstack(X)
+            idx = sample(range(len(X_mat)), int(1e5))
             if self.verbose is True:
                 print("Training KMeans...")
-            self.dictionary = KMeans(n_clusters=self.k).fit(X_mat)
+            self.dictionary = KMeans(n_clusters=self.k).fit(X_mat[idx])
             self.centers = self.dictionary.cluster_centers_
             if self.lcs is True and self.norming == "RN":
                 if self.verbose is True:
@@ -101,8 +103,8 @@ class VLAD:
 
         Parameters
         ----------
-        X : array, shape (m, d, n)
-            Tensor of image-descriptors
+        X : list(array)
+            List of image-descriptors
 
         Returns
         -------
@@ -117,8 +119,8 @@ class VLAD:
 
         Parameters
         ----------
-        X : array, shape (m, d, n)
-            Tensor of image-descriptors
+        X : list(array)
+            List of image-descriptors
 
         Returns
         -------
@@ -142,7 +144,6 @@ class VLAD:
         self : VLAD
             Refitted object
         """
-        # TODO: Maybe generalize better by passing a list of descriptors instead of a tensor!
         self.dictionary = KMeans(n_clusters=self.k, init=self.centers).fit(X.transpose((2, 0, 1))
                                                                            .reshape(-1, X.shape[1]))
         self.centers = self.dictionary.cluster_centers_
@@ -224,8 +225,8 @@ class VLAD:
 
         Parameters
         ----------
-        X : array, shape (m, d, n)
-            Tensor of image-descriptors
+        X : list(array)
+            List of image-descriptors
 
         Returns
         -------
@@ -233,8 +234,8 @@ class VLAD:
             Database of all VLAD-descriptors for the given Tensor
         """
         vlads = []
-        for i in pb.progressbar(range(X.shape[-1])):
-            vlads.append(self._vlad(X[..., i]))
+        for x in pb.progressbar(X):
+            vlads.append(self._vlad(x))
         database = np.vstack(vlads)
         return database
 
