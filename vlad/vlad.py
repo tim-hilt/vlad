@@ -25,12 +25,14 @@ class VLAD:
         For more info see below.
     lcs : bool, default=True
         If `True`, uses Local Coordinate System (LCS) described in [3]_.
+        alpha : float, default=0.2
+            The exponent for the root-part, default taken from [3]_
     verbose : bool, default=True
         If `True` print messages here and there
 
     Attributes
     ----------
-    dictionary : sklearn.cluster.KMeans(k)
+    vocabs : sklearn.cluster.KMeans(k)
         The visual vocabulary of the object
     centers : array
         The centroids for the visual vocabulary
@@ -55,13 +57,15 @@ class VLAD:
            Revisiting the VLAD image representation. In Proceedings of the 21st ACM
            international conference on Multimedia (pp. 653-656).
     """
-    def __init__(self, k=256, norming="original", lcs=False, verbose=True):
+    def __init__(self, k=256, n_vocabs=1, norming="original", lcs=False, alpha=0.2, verbose=True):
         self.k = k
+        self.n_vocabs = n_vocabs
         self.norming = norming
-        self.dictionary = None
+        self.vocabs = None
         self.centers = None
         self.database = None
         self.lcs = lcs
+        self.alpha = alpha
         self.qs = None
         self.verbose = verbose
 
@@ -78,23 +82,27 @@ class VLAD:
         self : VLAD
             Fitted object
         """
-        if self.dictionary is None:
-            X_mat = np.vstack(X)
+        X_mat = np.vstack(X)
+        self.vocabs = []
+        self.centers = []
+        self.qs = []
+        for i in range(self.n_vocabs):
+            if self.verbose is True:
+                print(f"Training vocab #{i}")
             idx = sample(range(len(X_mat)), int(1e5))
             if self.verbose is True:
-                print("Training KMeans...")
-            self.dictionary = KMeans(n_clusters=self.k).fit(X_mat[idx])
-            self.centers = self.dictionary.cluster_centers_
+                print(f"Training KMeans...")
+            self.vocabs.append(KMeans(n_clusters=self.k).fit(X_mat[idx]))
+            self.centers.append(self.vocabs[i].cluster_centers_)
             if self.lcs is True and self.norming == "RN":
                 if self.verbose is True:
                     print("Finding rotation-matrices...")
-                predicted = self.dictionary.predict(X_mat)
-                self.qs = []
-                for i in range(self.k):
-                    q = PCA().fit(X_mat[predicted == i]).components_
-                    self.qs.append(q)
-        else:
-            print("Dictionary already fitted. Use refit() to force retraining.")
+                predicted = self.vocabs[i].predict(X_mat)
+                qsi = []
+                for j in range(self.k):
+                    q = PCA().fit(X_mat[predicted == j]).components_
+                    qsi.append(q)
+                self.qs.append(qsi)
         self.database = self._extract_vlads(X)
         return self
 
@@ -134,6 +142,9 @@ class VLAD:
     def refit(self, X):
         """Refit the Visual Vocabulary
 
+        Uses the already learned cluster-centers as in initial values for
+        the KMeans-models
+
         Parameters
         ----------
         X : array
@@ -144,9 +155,14 @@ class VLAD:
         self : VLAD
             Refitted object
         """
-        self.dictionary = KMeans(n_clusters=self.k, init=self.centers).fit(X.transpose((2, 0, 1))
-                                                                           .reshape(-1, X.shape[1]))
-        self.centers = self.dictionary.cluster_centers_
+        self.vocabs = []
+        self.centers = []
+
+        for i in range(self.n_vocabs):
+            self.vocabs.append(KMeans(n_clusters=self.k, init=self.centers).fit(X.transpose((2, 0, 1))
+                                                                                .reshape(-1, X.shape[1])))
+            self.centers.append(self.vocabs[i].cluster_centers_)
+
         self.database = self._extract_vlads(X)
         return self
 
@@ -194,31 +210,35 @@ class VLAD:
             The VLAD-descriptor
         """
         np.seterr(invalid='ignore', divide='ignore')  # Division with 0 encountered below
+        vlads = []
 
-        predicted = self.dictionary.predict(X)
-        m, d = X.shape
-        V = np.zeros((self.k, d))  # Initialize VLAD-Matrix
+        for j in range(self.n_vocabs):  # Compute for multiple vocabs
+            predicted = self.vocabs[j].predict(X)
+            m, d = X.shape
+            V = np.zeros((self.k, d))  # Initialize VLAD-Matrix
 
-        if self.norming == "RN":
-            for i in range(self.k):
-                curr = X[predicted == i] - self.centers[i]
-                V[i] = np.sum(curr / norm(curr, axis=1)[:, None], axis=0)
-                if self.lcs is True:
-                    V[i] = self.qs[i] @ V[i]  # Equivalent to multiplication in  summation above
-        else:
-            for i in range(self.k):
-                V[i] = np.sum(X[predicted == i] - self.centers[i], axis=0)
+            if self.norming == "RN":
+                for i in range(self.k):
+                    curr = X[predicted == i] - self.centers[j][i]
+                    V[i] = np.sum(curr / norm(curr, axis=1)[:, None], axis=0)
+                    if self.lcs is True:
+                        V[i] = self.qs[j][i] @ V[i]  # Equivalent to multiplication in  summation above
+            else:
+                for i in range(self.k):
+                    V[i] = np.sum(X[predicted == i] - self.centers[j][i], axis=0)
 
-        if self.norming in ("intra", "RN"):
-            V /= norm(V, axis=1)[:, None]  # L2-normalize every sum of residuals
-            np.nan_to_num(V, copy=False)  # Some of the rows contain 0s. np.nan will be inserted when dividing by 0!
+            if self.norming in ("intra", "RN"):
+                V /= norm(V, axis=1)[:, None]  # L2-normalize every sum of residuals
+                np.nan_to_num(V, copy=False)  # Some of the rows contain 0s. np.nan will be inserted when dividing by 0!
 
-        if self.norming in ("original", "RN"):
-            V = self._power_law_norm(V)
+            if self.norming in ("original", "RN"):
+                V = self._power_law_norm(V)
 
-        V /= norm(V)  # Last L2-norming
+            V /= norm(V)  # Last L2-norming
+            V = V.flatten()
+            vlads.append(V)
 
-        return V.flatten()
+        return np.concatenate(vlads)
 
     def _extract_vlads(self, X):
         """Extract VLAD-descriptors for a number of images
@@ -253,63 +273,20 @@ class VLAD:
         """
         self.database = np.vstack((self.database, vlad))
 
-    def save_database(self):
-        """Save the fitted database to disk
-
-        Saving the database allows for future users to manually load it. This way some time can be
-        saved and the object doesn't have to be fitted.
-
-        Returns
-        -------
-        ``None``
-        """
-        if self.database is not None:
-            np.save("database.npy", self.database)
-        else:
-            print("No database fitted yet. use fit() first.")
-
-    def load_database(self, filename, force=False):
-        """Manually load database
-
-        Parameters
-        ----------
-        filename : str
-            Filename of the database
-        force : bool, default=True
-            If `True` forces loading of the database, even if `self.database` is not None
-
-        Returns
-        -------
-        ``None``
-        """
-        if self.database is None or force is True:
-            self.database = np.load(filename)
-        else:
-            print("There's a database present already. Use force=True to overwrite it.")
-
-    @staticmethod
-    def _power_law_norm(X, alpha=.2):
+    def _power_law_norm(self, X):
         """Perform power-Normalization on a given array
 
         Parameters
         ----------
         X : array
             Array that should be normalized
-        alpha : float, default=0.2
-            The exponent for the root-part, default taken from [1]_
 
         Returns
         -------
         normed : array
             Power-normalized array
-
-        References
-        ----------
-        .. [1] Delhumeau, J., Gosselin, P. H., Jégou, H., & Pérez, P. (2013, October).
-               Revisiting the VLAD image representation. In Proceedings of the 21st ACM
-               international conference on Multimedia (pp. 653-656).
         """
-        normed = np.sign(X) * np.abs(X)**alpha
+        normed = np.sign(X) * np.abs(X)**self.alpha
         return normed
 
     def __repr__(self):
