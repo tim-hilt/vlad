@@ -20,13 +20,17 @@ class VLAD:
     ----------
     k : int, default=256
         Number of clusters to obtain for the visual vocabulary.
+    n_vocabs : int, default=1
+        Number of vocabularies to use
     norming : {"original", "intra", "RN"}, default="original"
         How the norming of the VLAD-descriptors should be performed.
         For more info see below.
     lcs : bool, default=True
         If `True`, uses Local Coordinate System (LCS) described in [3]_.
-        alpha : float, default=0.2
-            The exponent for the root-part, default taken from [3]_
+    alpha : float, default=0.2
+        The exponent for the root-part, default taken from [3]_
+    aggregate : str, {'bagging', 'concat'}, default='bagging'
+        How to aggregate the VLAD-vectors when using multiple vocabularies
     verbose : bool, default=True
         If `True` print messages here and there
 
@@ -44,6 +48,12 @@ class VLAD:
     ``norming="original"`` uses the original formulation of [1]_. An updated formulation based on [2]_
     is provided by ``norming="intra"``. Finally the best norming based on [3]_ is provided by ``norming="RN"``.
 
+    The ``aggregate``-parameter either concatenates the individual VLAD-vectors followed by $L_2$-normalization
+    when ``aggregate='concat'`` or performs mean-pooling between the `n_vocabs` VLAD-vectors and thus performs
+    bagging. The effect is expected to be the same as sklearns ``VotingClassifier`` with ``voting`` set to ``soft``.
+    The mean-pooling is performed to keep scores comparable. The effect of ``bagging='concat'`` is the behavior found
+    in the literature, for example in [4]_ or [5]_.
+
     References
     ----------
     .. [1] Jégou, H., Douze, M., Schmid, C., & Pérez, P. (2010, June). Aggregating
@@ -56,8 +66,16 @@ class VLAD:
     .. [3] Delhumeau, J., Gosselin, P. H., Jégou, H., & Pérez, P. (2013, October).
            Revisiting the VLAD image representation. In Proceedings of the 21st ACM
            international conference on Multimedia (pp. 653-656).
+
+    .. [4] Jégou, H., & Chum, O. (2012, October). Negative evidences and co-occurences in image
+           retrieval: The benefit of PCA and whitening. In European conference on computer vision
+           (pp. 774-787). Springer, Berlin, Heidelberg.
+
+    .. [5] Spyromitros-Xioufis, E., Papadopoulos, S., Kompatsiaris, I. Y., Tsoumakas, G., & Vlahavas,
+           I. (2014). A comprehensive study over VLAD and product quantization in large-scale image retrieval.
+           IEEE Transactions on Multimedia, 16(6), 1713-1728.
     """
-    def __init__(self, k=256, n_vocabs=1, norming="original", lcs=False, alpha=0.2, verbose=True):
+    def __init__(self, k=256, n_vocabs=1, norming="original", lcs=False, alpha=0.2, aggregate='bagging', verbose=True):
         self.k = k
         self.n_vocabs = n_vocabs
         self.norming = norming
@@ -67,6 +85,7 @@ class VLAD:
         self.lcs = lcs
         self.alpha = alpha
         self.qs = None
+        self.aggregate = aggregate
         self.verbose = verbose
 
     def fit(self, X):
@@ -88,8 +107,8 @@ class VLAD:
         self.qs = []
         for i in range(self.n_vocabs):
             if self.verbose is True:
-                print(f"Training vocab #{i}")
-            idx = sample(range(len(X_mat)), int(1e5))
+                print(f"Training vocab #{i+1}")
+            idx = sample(range(len(X_mat)), int(2e5))
             if self.verbose is True:
                 print(f"Training KMeans...")
             self.vocabs.append(KMeans(n_clusters=self.k).fit(X_mat[idx]))
@@ -100,7 +119,9 @@ class VLAD:
                 predicted = self.vocabs[i].predict(X_mat)
                 qsi = []
                 for j in range(self.k):
-                    q = PCA().fit(X_mat[predicted == j]).components_
+                    q = PCA(n_components=X_mat.shape[1]).fit(X_mat[predicted == j]).components_
+                    # Below does not work everytime!
+                    # print(f"shape predicted for center {j}: {X_mat[predicted == j].shape}; q.shape: {q.shape}")
                     qsi.append(q)
                 self.qs.append(qsi)
         self.database = self._extract_vlads(X)
@@ -237,8 +258,9 @@ class VLAD:
             V /= norm(V)  # Last L2-norming
             V = V.flatten()
             vlads.append(V)
-
-        return np.concatenate(vlads)
+        vlads = np.concatenate(vlads)
+        vlads /= norm(vlads)  # Not on axis, because already flat
+        return vlads
 
     def _extract_vlads(self, X):
         """Extract VLAD-descriptors for a number of images
