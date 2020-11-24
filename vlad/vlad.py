@@ -215,7 +215,11 @@ class VLAD:
             The similarity for all database-classes
         """
         vlad = self._vlad(desc)  # Convert to VLAD-descriptor
-        return self.database @ vlad  # Similarity between L2-normed vectors is defined as dot-product
+        if self.aggregate == 'concat':
+            probas = self.database @ vlad  # Similarity between L2-normed vectors is defined as dot-product
+        else:
+            probas = np.einsum('ij,jik->ki', vlad, np.transpose(self.database, axes=(1, 0, 2))).mean(axis=1)
+        return probas
 
     def _vlad(self, X):
         """Construct the actual VLAD-descriptor from a matrix of local descriptors
@@ -258,8 +262,11 @@ class VLAD:
             V /= norm(V)  # Last L2-norming
             V = V.flatten()
             vlads.append(V)
-        vlads = np.concatenate(vlads)
-        vlads /= norm(vlads)  # Not on axis, because already flat
+        if self.aggregate == 'concat':
+            vlads = np.concatenate(vlads)
+            vlads /= norm(vlads)  # Not on axis, because already flat
+        else:
+            vlads = np.vstack(vlads)  # Return shape is (n_vocabs, len(vlad))
         return vlads
 
     def _extract_vlads(self, X):
@@ -278,7 +285,10 @@ class VLAD:
         vlads = []
         for x in pb.progressbar(X):
             vlads.append(self._vlad(x))
-        database = np.vstack(vlads)
+        if self.aggregate == 'concat':
+            database = np.vstack(vlads)
+        else:
+            database = np.dstack(vlads)
         return database
 
     def _add_to_database(self, vlad):
