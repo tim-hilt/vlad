@@ -5,6 +5,7 @@ from random import sample
 
 import numpy as np
 from numpy.linalg import norm
+# from sklearn.cluster import MiniBatchKMeans as KMeans
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 import progressbar as pb
@@ -75,7 +76,7 @@ class VLAD:
            I. (2014). A comprehensive study over VLAD and product quantization in large-scale image retrieval.
            IEEE Transactions on Multimedia, 16(6), 1713-1728.
     """
-    def __init__(self, k=256, n_vocabs=1, norming="original", lcs=False, alpha=0.2, aggregate='bagging', verbose=True):
+    def __init__(self, k=256, n_vocabs=1, norming="original", lcs=False, alpha=0.2, aggregate='concat', verbose=True):
         self.k = k
         self.n_vocabs = n_vocabs
         self.norming = norming
@@ -108,10 +109,13 @@ class VLAD:
         for i in range(self.n_vocabs):
             if self.verbose is True:
                 print(f"Training vocab #{i+1}")
-            idx = sample(range(len(X_mat)), int(2e5))
             if self.verbose is True:
                 print(f"Training KMeans...")
-            self.vocabs.append(KMeans(n_clusters=self.k).fit(X_mat[idx]))
+            if len(X_mat) < int(2e5):
+                self.vocabs.append(KMeans(n_clusters=self.k).fit(X_mat))
+            else:
+                idx = sample(range(len(X_mat)), int(2e5))
+                self.vocabs.append(KMeans(n_clusters=self.k).fit(X_mat[idx]))
             self.centers.append(self.vocabs[i].cluster_centers_)
             if self.lcs is True and self.norming == "RN":
                 if self.verbose is True:
@@ -120,8 +124,6 @@ class VLAD:
                 qsi = []
                 for j in range(self.k):
                     q = PCA(n_components=X_mat.shape[1]).fit(X_mat[predicted == j]).components_
-                    # Below does not work everytime!
-                    # print(f"shape predicted for center {j}: {X_mat[predicted == j].shape}; q.shape: {q.shape}")
                     qsi.append(q)
                 self.qs.append(qsi)
         self.database = self._extract_vlads(X)
@@ -238,20 +240,28 @@ class VLAD:
         vlads = []
 
         for j in range(self.n_vocabs):  # Compute for multiple vocabs
-            predicted = self.vocabs[j].predict(X)
+            # predicted = self.vocabs[j].predict(X)  # Commented out in favor of line below (No dependency on actual vocab, but only on centroids)
+            predicted = norm(X - self.centers[j][:, None, :], axis=-1).argmin(axis=0)
             m, d = X.shape
             V = np.zeros((self.k, d))  # Initialize VLAD-Matrix
 
+            # Computing residuals
             if self.norming == "RN":
+                curr = X - self.centers[j][predicted]
+                curr /= norm(curr, axis=1)[:, None]
+                # Untenstehendes kann noch vektorisiert werden
                 for i in range(self.k):
-                    curr = X[predicted == i] - self.centers[j][i]
-                    V[i] = np.sum(curr / norm(curr, axis=1)[:, None], axis=0)
+                    V[i] = np.sum(curr[predicted == i], axis=0)
                     if self.lcs is True:
                         V[i] = self.qs[j][i] @ V[i]  # Equivalent to multiplication in  summation above
             else:
                 for i in range(self.k):
                     V[i] = np.sum(X[predicted == i] - self.centers[j][i], axis=0)
 
+            # hist, _ = np.histogram(predicted, bins=range(self.k+1))
+            # V = np.c_[V, hist[:, None]]
+
+            # Norming
             if self.norming in ("intra", "RN"):
                 V /= norm(V, axis=1)[:, None]  # L2-normalize every sum of residuals
                 np.nan_to_num(V, copy=False)  # Some of the rows contain 0s. np.nan will be inserted when dividing by 0!
