@@ -112,10 +112,9 @@ class VLAD:
                 if self.verbose is True:
                     print("Finding rotation-matrices...")
                 predicted = self.vocabs[i].predict(X_mat)
-                qsi = []
+                qsi = np.zeros((X_mat.shape[1], X_mat.shape[1], self.k))
                 for j in range(self.k):
-                    q = PCA(n_components=X_mat.shape[1]).fit(X_mat[predicted == j]).components_
-                    qsi.append(q)
+                    qsi[..., i] = PCA(n_components=X_mat.shape[1]).fit(X_mat[predicted == j]).components_
                 self.qs.append(qsi)
         self.database = self._extract_vlads(X)
         return self
@@ -229,22 +228,20 @@ class VLAD:
         for j in range(self.n_vocabs):  # Compute for multiple vocabs
             # predicted = self.vocabs[j].predict(X)  # Commented out in favor of line below (No dependency on actual vocab, but only on centroids)
             predicted = norm(X - self.centers[j][:, None, :], axis=-1).argmin(axis=0)
-            _, d = X.shape
-            V = np.zeros((self.k, d))  # Initialize VLAD-Matrix
-
+            curr = X - self.centers[j][predicted]
+            mask = np.arange(self.k)[:, None] == predicted
+            
             # Computing residuals
             if self.norming == "RN":
-                curr = X - self.centers[j][predicted]
                 curr /= norm(curr, axis=1)[:, None]
+                V = mask @ curr
+                
                 # Untenstehendes kann noch vektorisiert werden
-
-                for i in range(self.k):
-                    V[i] = np.sum(curr[predicted == i], axis=0)
-                    if self.lcs is True:
-                        V[i] = self.qs[j][i] @ V[i]  # Equivalent to multiplication in  summation above
+                if self.lcs is True:
+                    for i in range(self.k):
+                        V[i] = self.qs[j][..., i] @ V[i]  # Equivalent to multiplication in  summation above
             else:
-                for i in range(self.k):
-                    V[i] = np.sum(X[predicted == i] - self.centers[j][i], axis=0)
+                V = mask @ curr
 
             # Norming
             if self.norming in ("intra", "RN"):
