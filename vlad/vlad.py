@@ -30,8 +30,6 @@ class VLAD:
         If `True`, uses Local Coordinate System (LCS) described in [3]_.
     alpha : float, default=0.2
         The exponent for the root-part, default taken from [3]_
-    aggregate : str, {'bagging', 'concat'}, default='bagging'
-        How to aggregate the VLAD-vectors when using multiple vocabularies
     verbose : bool, default=True
         If `True` print messages here and there
 
@@ -48,12 +46,6 @@ class VLAD:
     -----
     ``norming="original"`` uses the original formulation of [1]_. An updated formulation based on [2]_
     is provided by ``norming="intra"``. Finally the best norming based on [3]_ is provided by ``norming="RN"``.
-
-    The ``aggregate``-parameter either concatenates the individual VLAD-vectors followed by $L_2$-normalization
-    when ``aggregate='concat'`` or performs mean-pooling between the `n_vocabs` VLAD-vectors and thus performs
-    bagging. The effect is expected to be the same as sklearns ``VotingClassifier`` with ``voting`` set to ``soft``.
-    The mean-pooling is performed to keep scores comparable. The effect of ``bagging='concat'`` is the behavior found
-    in the literature, for example in [4]_ or [5]_.
 
     References
     ----------
@@ -76,7 +68,7 @@ class VLAD:
            I. (2014). A comprehensive study over VLAD and product quantization in large-scale image retrieval.
            IEEE Transactions on Multimedia, 16(6), 1713-1728.
     """
-    def __init__(self, k=256, n_vocabs=1, norming="original", lcs=False, alpha=0.2, aggregate='concat', verbose=True):
+    def __init__(self, k=256, n_vocabs=1, norming="original", lcs=False, alpha=0.2, verbose=True):
         self.k = k
         self.n_vocabs = n_vocabs
         self.norming = norming
@@ -86,7 +78,6 @@ class VLAD:
         self.lcs = lcs
         self.alpha = alpha
         self.qs = None
-        self.aggregate = aggregate
         self.verbose = verbose
 
     def fit(self, X):
@@ -217,11 +208,7 @@ class VLAD:
             The similarity for all database-classes
         """
         vlad = self._vlad(desc)  # Convert to VLAD-descriptor
-        if self.aggregate == 'concat':
-            probas = self.database @ vlad  # Similarity between L2-normed vectors is defined as dot-product
-        else:
-            probas = np.einsum('ij,jik->ki', vlad, np.transpose(self.database, axes=(1, 0, 2))).mean(axis=1)
-        return probas
+        return self.database @ vlad  # Similarity between L2-normed vectors is defined as dot-product
 
     def _vlad(self, X):
         """Construct the actual VLAD-descriptor from a matrix of local descriptors
@@ -242,7 +229,7 @@ class VLAD:
         for j in range(self.n_vocabs):  # Compute for multiple vocabs
             # predicted = self.vocabs[j].predict(X)  # Commented out in favor of line below (No dependency on actual vocab, but only on centroids)
             predicted = norm(X - self.centers[j][:, None, :], axis=-1).argmin(axis=0)
-            m, d = X.shape
+            _, d = X.shape
             V = np.zeros((self.k, d))  # Initialize VLAD-Matrix
 
             # Computing residuals
@@ -250,6 +237,7 @@ class VLAD:
                 curr = X - self.centers[j][predicted]
                 curr /= norm(curr, axis=1)[:, None]
                 # Untenstehendes kann noch vektorisiert werden
+
                 for i in range(self.k):
                     V[i] = np.sum(curr[predicted == i], axis=0)
                     if self.lcs is True:
@@ -257,9 +245,6 @@ class VLAD:
             else:
                 for i in range(self.k):
                     V[i] = np.sum(X[predicted == i] - self.centers[j][i], axis=0)
-
-            # hist, _ = np.histogram(predicted, bins=range(self.k+1))
-            # V = np.c_[V, hist[:, None]]
 
             # Norming
             if self.norming in ("intra", "RN"):
@@ -272,11 +257,8 @@ class VLAD:
             V /= norm(V)  # Last L2-norming
             V = V.flatten()
             vlads.append(V)
-        if self.aggregate == 'concat':
-            vlads = np.concatenate(vlads)
-            vlads /= norm(vlads)  # Not on axis, because already flat
-        else:
-            vlads = np.vstack(vlads)  # Return shape is (n_vocabs, len(vlad))
+        vlads = np.concatenate(vlads)
+        vlads /= norm(vlads)  # Not on axis, because already flat
         return vlads
 
     def _extract_vlads(self, X):
@@ -293,12 +275,14 @@ class VLAD:
             Database of all VLAD-descriptors for the given Tensor
         """
         vlads = []
-        for x in pb.progressbar(X):
-            vlads.append(self._vlad(x))
-        if self.aggregate == 'concat':
-            database = np.vstack(vlads)
+        if self.verbose:
+            for x in pb.progressbar(X):
+                vlads.append(self._vlad(x))
         else:
-            database = np.dstack(vlads)
+            for x in X:
+                vlads.append(self._vlad(x))
+
+        database = np.vstack(vlads)
         return database
 
     def _add_to_database(self, vlad):
