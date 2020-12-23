@@ -235,11 +235,8 @@ class VLAD:
             if self.norming == "RN":
                 curr /= norm(curr, axis=1)[:, None]
                 V = mask @ curr
-                
-                # Untenstehendes kann noch vektorisiert werden
                 if self.lcs is True:
-                    for i in range(self.k):
-                        V[i] = self.qs[j][..., i] @ V[i]  # Equivalent to multiplication in  summation above
+                    V = np.einsum('jk,ikj->ji', V, self.qs[j])
             else:
                 V = mask @ curr
 
