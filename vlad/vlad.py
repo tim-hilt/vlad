@@ -69,6 +69,13 @@ class VLAD:
            IEEE Transactions on Multimedia, 16(6), 1713-1728.
     """
     def __init__(self, k=256, n_vocabs=1, norming="original", lcs=False, alpha=0.2, verbose=True):
+        """Initialize VLAD-object
+
+        Notes
+        -----
+
+        Hyperparameters have to be set, even if `centers` and `qs` are set externally.
+        """
         self.k = k
         self.n_vocabs = n_vocabs
         self.norming = norming
@@ -95,8 +102,8 @@ class VLAD:
         """
         X_mat = np.vstack(X)
         self.vocabs = []
-        self.centers = []
-        self.qs = []
+        self.centers = []  # Is a list of `n_vocabs` np.arrays. Can be set externally without fitting
+        self.qs = []  # Is a list of `n_vocabs` lists of length `k` of np.arrays. Can be set externally without fitting
         for i in range(self.n_vocabs):
             if self.verbose is True:
                 print(f"Training vocab #{i+1}")
