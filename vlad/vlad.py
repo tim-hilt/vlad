@@ -5,7 +5,7 @@ from random import sample
 
 import numpy as np
 from numpy.linalg import norm
-# from sklearn.cluster import MiniBatchKMeans as KMeans
+import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 import progressbar as pb

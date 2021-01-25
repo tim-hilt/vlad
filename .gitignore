@@ -2,3 +2,4 @@
 *.joblib
 .ipynb_checkpoints
 /vlad/__pycache__/
+.vscode/
